@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Statistics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 300px;
+            width: 100%;
+        }
+        .stats-card {
+            margin-bottom: 20px;
+        }
+        #statisticsContainer {
+            display: none;
+        }
+        #noDataMessage {
+            display: none;
+        }
+        .loading {
+            display: inline-block;
+            width: 2rem;
+            height: 2rem;
+            border: 0.25rem solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-border .75s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-broadcast-tower"></i> Network Monitor
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fas fa-home"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/statistics_page"><i class="fas fa-chart-bar"></i> Statistics</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">Network Statistics</h1>
+        
+        <!-- User Selection and Authentication -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Select User</h5>
+                <div class="row align-items-end">
+                    <div class="col-md-5">
+                        <label for="userSelect" class="form-label">User</label>
+                        <select class="form-select" id="userSelect">
+                            <option value="" selected disabled>Select a user</option>
+                            <!-- User options will be filled dynamically -->
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <div id="authStatus" class="mt-2">
+                            <div class="alert alert-info">
+                                <span id="authMessage"><i class="fas fa-info-circle"></i> Simply select a user from the dropdown to view their statistics. Admin login is optional.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-secondary w-100" id="adminLoginBtn" data-bs-toggle="modal" data-bs-target="#loginModal">
+                            <i class="fas fa-lock-open"></i> Login (optional)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Login Modal -->
+        <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="loginModalLabel">Admin Login</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="loginEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="loginEmail">
+                        </div>
+                        <div class="mb-3">
+                            <label for="loginPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="loginPassword">
+                        </div>
+                        <div id="loginError" class="alert alert-danger d-none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="loginBtn">Login</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Range Selection -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Select Date Range</h5>
+                <div class="row">
+                    <div class="col-md-5">
+                        <label for="startDate" class="form-label">Start Date</label>
+                        <input type="datetime-local" class="form-control" id="startDate">
+                    </div>
+                    <div class="col-md-5">
+                        <label for="endDate" class="form-label">End Date</label>
+                        <input type="datetime-local" class="form-control" id="endDate">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" id="fetchStatsBtn" onclick="fetchStatistics()">Get Statistics</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="text-center my-5 d-none">
+            <div class="loading"></div>
+            <p class="mt-3">Loading statistics...</p>
+        </div>
+
+        <!-- No Data Message -->
+        <div id="noDataMessage" class="alert alert-warning">
+            <h4 class="alert-heading">No Data Available</h4>
+            <p>There is no network data available for the selected user and date range.</p>
+            <p>Try selecting a different user or date range.</p>
+        </div>
+
+        <div id="statisticsContainer">
+            <!-- Operator Statistics -->
+            <div class="card stats-card">
+                <div class="card-body">
+                    <h5 class="card-title">Operator Usage Distribution</h5>
+                    <p class="card-subtitle text-muted mb-3">Average connectivity time per operator</p>
+                    <div class="chart-container">
+                        <canvas id="operatorChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Type Statistics -->
+            <div class="card stats-card">
+                <div class="card-body">
+                    <h5 class="card-title">Network Type Usage</h5>
+                    <p class="card-subtitle text-muted mb-3">Average connectivity time per network type (4G, 3G, 2G)</p>
+                    <div class="chart-container">
+                        <canvas id="networkTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Power Statistics -->
+            <div class="card stats-card">
+                <div class="card-body">
+                    <h5 class="card-title">Average Signal Power by Network Type</h5>
+                    <p class="card-subtitle text-muted mb-3">Signal strength in dBm across different network types</p>
+                    <div class="chart-container">
+                        <canvas id="signalPowerChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SINR Statistics -->
+            <div class="card stats-card">
+                <div class="card-body">
+                    <h5 class="card-title">Average SINR by Network Type</h5>
+                    <p class="card-subtitle text-muted mb-3">Signal-to-Interference-plus-Noise Ratio (when applicable)</p>
+                    <div class="chart-container">
+                        <canvas id="sinrChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Device Statistics -->
+            <div class="card stats-card">
+                <div class="card-body">
+                    <h5 class="card-title">Average Signal Power by Device</h5>
+                    <p class="card-subtitle text-muted mb-3">Signal strength comparison across different devices</p>
+                    <div class="chart-container">
+                        <canvas id="deviceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let operatorChart, networkTypeChart, signalPowerChart, sinrChart, deviceChart;
+        let currentUser = null;
+        let jwtToken = localStorage.getItem('token');
+
+        function formatDateForInput(date) {
+            return date.toISOString().slice(0, 16);
+        }
+
+        // Set default date range to last 24 hours
+        window.onload = function() {
+            const endDate = new Date();
+            const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+            
+            document.getElementById('startDate').value = formatDateForInput(startDate);
+            document.getElementById('endDate').value = formatDateForInput(endDate);
+            
+            // Fetch users for the dropdown
+            fetchUsers().then(() => {
+                // Auto-select first user if there's only one user
+                const userSelect = document.getElementById('userSelect');
+                if (userSelect && userSelect.options.length === 2) { // 2 because of the initial disabled option
+                    userSelect.selectedIndex = 1;
+                    currentUser = userSelect.value;
+                    document.getElementById('authStatus').innerHTML = `
+                        <div class="alert alert-primary">
+                            <i class="fas fa-user"></i> Viewing data for: ${currentUser}
+                        </div>
+                    `;
+                    
+                    // Automatically fetch statistics
+                    fetchStatistics();
+                }
+            });
+            
+            // Check if we have a token in localStorage
+            if (jwtToken) {
+                validateToken();
+            }
+        };
+
+        function validateToken() {
+            // Show loading state
+            document.getElementById('authMessage').textContent = "Validating authentication...";
+            
+            // Call an endpoint to verify token
+            fetch('/refresh', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${jwtToken}`
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Invalid token');
+            })
+            .then(data => {
+                // Token is valid
+                if (data.access_token) {
+                    jwtToken = data.access_token;
+                    localStorage.setItem('token', jwtToken);
+                }
+                
+                document.getElementById('authStatus').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Authenticated as admin
+                    </div>
+                `;
+                document.getElementById('adminLoginBtn').textContent = "Logout";
+                document.getElementById('adminLoginBtn').onclick = logout;
+                document.getElementById('adminLoginBtn').setAttribute('data-bs-toggle', '');
+                document.getElementById('adminLoginBtn').setAttribute('data-bs-target', '');
+                
+                // Auto-select first user if we're admin
+                setTimeout(() => {
+                    const userSelect = document.getElementById('userSelect');
+                    if (userSelect && userSelect.options.length > 1) {
+                        userSelect.selectedIndex = 1; // First actual user (not the placeholder)
+                        currentUser = userSelect.value;
+                        document.getElementById('authStatus').innerHTML = `
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle"></i> Admin viewing data for: ${currentUser}
+                            </div>
+                        `;
+                        // Automatically fetch statistics for this user
+                        fetchStatistics();
+                    }
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Authentication error:', error);
+                document.getElementById('authStatus').innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Not authenticated as admin
+                    </div>
+                `;
+                jwtToken = null;
+                localStorage.removeItem('token');
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            jwtToken = null;
+            document.getElementById('authStatus').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Not authenticated as admin
+                </div>
+            `;
+            document.getElementById('adminLoginBtn').textContent = "Admin Login";
+            document.getElementById('adminLoginBtn').onclick = null;
+            document.getElementById('adminLoginBtn').setAttribute('data-bs-toggle', 'modal');
+            document.getElementById('adminLoginBtn').setAttribute('data-bs-target', '#loginModal');
+            location.reload();
+        }
+
+        function fetchUsers() {
+            // Fetch users for dropdown
+            return fetch('/dashboard_data')
+                .then(response => response.json())
+                .then(data => {
+                    const userSelect = document.getElementById('userSelect');
+                    data.users.forEach(user => {
+                        const option = document.createElement('option');
+                        option.value = user.email;
+                        option.textContent = user.email;
+                        userSelect.appendChild(option);
+                    });
+                    return data.users;
+                })
+                .catch(error => {
+                    console.error('Error fetching users:', error);
+                    return [];
+                });
+        }
+
+        // Handle login
+        document.getElementById('loginBtn').addEventListener('click', function() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            errorDiv.classList.add('d-none');
+            
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: email,
+                    password: password
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Login failed');
+            })
+            .then(data => {
+                jwtToken = data.access_token;
+                localStorage.setItem('token', jwtToken);
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                modal.hide();
+                
+                // Update UI
+                document.getElementById('authStatus').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Authenticated as admin
+                    </div>
+                `;
+                document.getElementById('adminLoginBtn').textContent = "Logout";
+                document.getElementById('adminLoginBtn').onclick = logout;
+                document.getElementById('adminLoginBtn').setAttribute('data-bs-toggle', '');
+                document.getElementById('adminLoginBtn').setAttribute('data-bs-target', '');
+            })
+            .catch(error => {
+                console.error('Login error:', error);
+                errorDiv.textContent = "Login failed. Please check your credentials.";
+                errorDiv.classList.remove('d-none');
+            });
+        });
+
+        // Handle user selection
+        document.getElementById('userSelect').addEventListener('change', function() {
+            currentUser = this.value;
+            if (currentUser) {
+                if (jwtToken) {
+                    document.getElementById('authStatus').innerHTML = `
+                        <div class="alert alert-success">
+                            <i class="fas fa-user-shield"></i> Admin viewing data for: ${currentUser}
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('authStatus').innerHTML = `
+                        <div class="alert alert-primary">
+                            <i class="fas fa-user"></i> Viewing data for: ${currentUser}
+                        </div>
+                    `;
+                }
+                
+                // Auto-fetch statistics when user changes
+                fetchStatistics();
+            }
+        });
+
+        function fetchStatistics() {
+            // Hide charts and show loading
+            document.getElementById('statisticsContainer').style.display = 'none';
+            document.getElementById('noDataMessage').style.display = 'none';
+            document.getElementById('loadingIndicator').classList.remove('d-none');
+            
+            // Validate we have a user selected
+            if (!currentUser) {
+                alert('Please select a user first');
+                document.getElementById('loadingIndicator').classList.add('d-none');
+                return;
+            }
+            
+            // Format dates properly
+            let startDate = document.getElementById('startDate').value;
+            let endDate = document.getElementById('endDate').value;
+            
+            // Ensure dates are in ISO format
+            if (startDate && !startDate.includes('T')) {
+                startDate = startDate + 'T00:00:00';
+            }
+            
+            if (endDate && !endDate.includes('T')) {
+                endDate = endDate + 'T23:59:59';
+            }
+            
+            console.log('Sending request with dates:', startDate, endDate);
+            
+            // Prepare headers
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            // Add token if available (but it's optional now)
+            if (jwtToken) {
+                headers['Authorization'] = `Bearer ${jwtToken}`;
+            }
+            
+            // Update the authentication status display
+            if (!jwtToken) {
+                document.getElementById('adminLoginBtn').innerHTML = `
+                    <i class="fas fa-lock-open"></i> Login (optional)
+                `;
+            }
+
+            fetch('/get_statistics', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    user_email: currentUser // Add selected user
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                
+                if (response.status === 401) {
+                    // Authentication error
+                    throw new Error('Authentication required');
+                }
+                
+                throw new Error('Failed to fetch statistics');
+            })
+            .then(data => {
+                document.getElementById('loadingIndicator').classList.add('d-none');
+                
+                if (!data.has_data) {
+                    // No data available
+                    document.getElementById('noDataMessage').style.display = 'block';
+                    return;
+                }
+                
+                // Show the charts and update them
+                document.getElementById('statisticsContainer').style.display = 'block';
+                updateCharts(data);
+            })
+            .catch(error => {
+                document.getElementById('loadingIndicator').classList.add('d-none');
+                console.error('Error fetching statistics:', error);
+                
+                if (error.message === 'Authentication required') {
+                    alert('Please log in as an admin to view statistics.');
+                } else {
+                    alert('Error fetching statistics. Please try again.');
+                }
+            });
+        }
+
+        function updateCharts(data) {
+            // Create colors for charts
+            const colors = ['#FF6384', '#36A2EB', '#4BC0C0', '#FFCE56', '#9966FF', '#C9CBCF', '#4BC0C0', '#FF9F40'];
+            
+            // Get operator data
+            const operatorLabels = Object.keys(data.operators);
+            const operatorData = operatorLabels.map(key => data.operators[key]);
+            const operatorTotal = operatorData.reduce((a, b) => a + b, 0);
+            const operatorPercentages = operatorData.map(value => (value / operatorTotal * 100).toFixed(1));
+            
+            // Get network type data
+            const networkLabels = Object.keys(data.network_types);
+            const networkData = networkLabels.map(key => data.network_types[key]);
+            const networkTotal = networkData.reduce((a, b) => a + b, 0);
+            const networkPercentages = networkData.map(value => (value / networkTotal * 100).toFixed(1));
+            
+            // Update Operator Chart
+            if (operatorChart) operatorChart.destroy();
+            const operatorCtx = document.getElementById('operatorChart').getContext('2d');
+            operatorChart = new Chart(operatorCtx, {
+                type: 'pie',
+                data: {
+                    labels: operatorLabels.map((label, i) => `${label} (${operatorPercentages[i]}%)`),
+                    datasets: [{
+                        data: operatorData,
+                        backgroundColor: colors.slice(0, operatorLabels.length)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw;
+                                    const percentage = (value / operatorTotal * 100).toFixed(1);
+                                    return `${label}: ${value} entries (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update Network Type Chart
+            if (networkTypeChart) networkTypeChart.destroy();
+            const networkTypeCtx = document.getElementById('networkTypeChart').getContext('2d');
+            networkTypeChart = new Chart(networkTypeCtx, {
+                type: 'pie',
+                data: {
+                    labels: networkLabels.map((label, i) => `${label} (${networkPercentages[i]}%)`),
+                    datasets: [{
+                        data: networkData,
+                        backgroundColor: colors.slice(0, networkLabels.length)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw;
+                                    const percentage = (value / networkTotal * 100).toFixed(1);
+                                    return `${label}: ${value} entries (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update Signal Power Chart
+            if (signalPowerChart) signalPowerChart.destroy();
+            const signalPowerCtx = document.getElementById('signalPowerChart').getContext('2d');
+            signalPowerChart = new Chart(signalPowerCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.network_type_stats),
+                    datasets: [{
+                        label: 'Average Signal Power (dBm)',
+                        data: Object.values(data.network_type_stats).map(stat => stat.average_signal_power.toFixed(2)),
+                        backgroundColor: '#36A2EB'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Signal Power (dBm)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update SINR Chart
+            if (sinrChart) sinrChart.destroy();
+            const sinrCtx = document.getElementById('sinrChart').getContext('2d');
+            sinrChart = new Chart(sinrCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.network_type_stats),
+                    datasets: [{
+                        label: 'Average SINR (dB)',
+                        data: Object.values(data.network_type_stats).map(stat => stat.average_sinr.toFixed(2)),
+                        backgroundColor: '#FFCE56'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'SINR (dB)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update Device Chart
+            if (deviceChart) deviceChart.destroy();
+            const deviceCtx = document.getElementById('deviceChart').getContext('2d');
+            deviceChart = new Chart(deviceCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.device_stats),
+                    datasets: [{
+                        label: 'Average Signal Power (dBm)',
+                        data: Object.values(data.device_stats).map(stat => stat.average_signal_power.toFixed(2)),
+                        backgroundColor: '#4BC0C0'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Signal Power (dBm)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html> 

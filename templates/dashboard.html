@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Server Dashboard</title>
+  <!-- Bootstrap CSS -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+  />
+  <!-- Font Awesome (Optional for Icons) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+  />
+  <!-- Socket.IO -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+</head>
+<body class="bg-light">
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <i class="fas fa-broadcast-tower"></i> Server Dashboard
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" href="/"><i class="fas fa-home"></i> Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/statistics_page"><i class="fas fa-chart-bar"></i> Statistics</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="container my-4">
+
+    <!-- Device Overview Stats -->
+    <div class="row g-4 mb-4">
+      <div class="col-md-6 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <i class="fas fa-broadcast-tower"></i> Registered Devices Overview
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="card bg-primary text-white mb-3">
+                  <div class="card-body text-center">
+                    <h1 id="connectedDevicesCount">0</h1>
+                    <p class="mb-0">Active Registered Devices</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card bg-info text-white">
+                  <div class="card-body text-center">
+                    <h1 id="totalDevicesCount">0</h1>
+                    <p class="mb-0">Total Registered Devices</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Network Stats -->
+      <div class="col-md-6 mb-4">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <i class="fas fa-chart-line"></i> Network Overview
+          </div>
+          <div class="card-body">
+            <div class="alert alert-info mb-0">
+              <h5 class="alert-heading">Quick Stats</h5>
+              <p>View detailed network statistics for each device in the Device Details section below.</p>
+              <hr>
+              <p class="mb-0">Go to <a href="/statistics_page" class="alert-link">Statistics Page</a> for historical data analysis.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 1: Registered Users & Registered Devices -->
+    <div class="row g-4 mb-4">
+
+      <!-- Registered Users -->
+      <div class="col-md-6">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <i class="fas fa-user-friends"></i> Registered Users
+          </div>
+          <div class="card-body">
+            <!-- Jinja2 initial load -->
+            {% if users|length > 0 %}
+              <ul id="userList" class="list-group list-group-flush">
+                {% for user in users %}
+                  <li class="list-group-item">
+                    <i class="fas fa-user"></i>
+                    <strong>{{ user.email }}</strong>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <ul id="userList" class="list-group list-group-flush"></ul>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Registered Devices -->
+      <div class="col-md-6">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <i class="fas fa-mobile-alt"></i> Registered Devices
+          </div>
+          <div class="card-body">
+            <!-- Jinja2 initial load -->
+            {% if devices|length > 0 %}
+              <ul id="deviceList" class="list-group list-group-flush">
+                {% for device in devices %}
+                  <li class="list-group-item">
+                    <i class="fas fa-microchip"></i>
+                    <strong>{{ device.device_name }}</strong>
+                    <small class="text-muted">({{ device.device_id }})</small>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <ul id="deviceList" class="list-group list-group-flush"></ul>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Device IP Addresses -->
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <i class="fas fa-network-wired"></i> Device IP Addresses
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Device Name</th>
+                    <th>Device ID</th>
+                    <th>IP Address</th>
+                    <th>Last Active Session</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="deviceIpTable">
+                  <!-- Will be filled dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-Device Statistics -->
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="card shadow">
+          <div class="card-header bg-dark text-white">
+            <i class="fas fa-chart-bar"></i> Per-Device Statistics
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>Last Operator</th>
+                    <th>Network Type</th>
+                    <th>Avg Signal Power</th>
+                    <th>Avg SINR</th>
+                    <th>Frequency Band</th>
+                    <th>Data Points</th>
+                  </tr>
+                </thead>
+                <tbody id="deviceStatsTable">
+                  <!-- Will be filled dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+
+  <!-- Bootstrap JS (Optional if you want interactive components) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Real-Time Log Updates + Auto Refresh for Users/Devices -->
+  <script>
+    // Initialize Socket.IO for real-time log updates
+    var socket = io();
+
+    // Listen for log_update events from server.py
+    socket.on('log_update', function(data) {
+      addLogEntry(data);
+    });
+
+    // Add a single new log entry to the list (for real-time updates)
+    function addLogEntry(log) {
+      var logList = document.getElementById("logList");
+      if (!logList) return;
+      var li = document.createElement("li");
+      li.classList.add("list-group-item");
+
+      // Choose color for log badge
+      var badgeClass = (log.type === "ERROR") ? "danger" : "info";
+      li.innerHTML = `
+        <strong>${log.time}</strong>
+        <span class="badge bg-${badgeClass}">${log.type}</span>
+        ${log.message}
+      `;
+      logList.appendChild(li);
+      logList.scrollTop = logList.scrollHeight; // Scroll to bottom if desired
+    }
+
+    // Periodic refresh for user & device lists (and logs if you want to keep them in sync)
+    setInterval(fetchDashboardData, 5000);
+
+    function fetchDashboardData() {
+      // We add a timestamp to avoid potential caching
+      fetch('/dashboard_data?t=' + new Date().getTime())
+        .then(response => response.json())
+        .then(data => {
+          updateUserList(data.users);
+          updateDeviceList(data.devices);
+          updateDeviceCount(data.connected_devices_count, data.devices.length);
+          updateDeviceIPs(data.device_ips);
+          updateDeviceStats(data.device_stats, data.device_ips);
+        })
+        .catch(error => console.error('Error fetching dashboard data:', error));
+    }
+
+    // Update user list in the DOM
+    function updateUserList(users) {
+      var userList = document.getElementById("userList");
+      if (!userList) return;
+      userList.innerHTML = "";
+      if (users.length === 0) {
+        userList.innerHTML = ``;
+        return;
+      }
+      users.forEach(function(user) {
+        var li = document.createElement("li");
+        li.classList.add("list-group-item");
+        li.innerHTML = `
+          <i class="fas fa-user"></i>
+          <strong>${user.email}</strong>
+        `;
+        userList.appendChild(li);
+      });
+    }
+
+    // Update device list in the DOM
+    function updateDeviceList(devices) {
+      var deviceList = document.getElementById("deviceList");
+      if (!deviceList) return;
+      deviceList.innerHTML = "";
+      if (devices.length === 0) {
+        deviceList.innerHTML = ``;
+        return;
+      }
+      devices.forEach(function(device) {
+        var li = document.createElement("li");
+        li.classList.add("list-group-item");
+        li.innerHTML = `
+          <i class="fas fa-microchip"></i>
+          <strong>${device.device_name}</strong>
+          <small class="text-muted">(${device.device_id})</small>
+        `;
+        deviceList.appendChild(li);
+      });
+    }
+
+    // Update device count displays
+    function updateDeviceCount(connectedCount, totalCount) {
+      document.getElementById('connectedDevicesCount').textContent = connectedCount;
+      document.getElementById('totalDevicesCount').textContent = totalCount;
+    }
+
+    // Update device IP table
+    function updateDeviceIPs(deviceIPs) {
+      var table = document.getElementById('deviceIpTable');
+      if (!table) return;
+      table.innerHTML = "";
+      
+      if (deviceIPs.length === 0) {
+        table.innerHTML = `<tr><td colspan="5" class="text-center">No device connection history available.</td></tr>`;
+        return;
+      }
+      
+      deviceIPs.forEach(function(device) {
+        var row = document.createElement('tr');
+        // Add status badge
+        const statusBadge = device.is_active 
+          ? '<span class="badge bg-success">Active</span>' 
+          : '<span class="badge bg-secondary">Inactive</span>';
+          
+        // Format the date
+        const lastActive = new Date(device.last_active);
+        const formattedDate = lastActive.toLocaleString();
+        
+        row.innerHTML = `
+          <td>${device.device_name}</td>
+          <td>${device.device_id}</td>
+          <td>${device.ip_address}</td>
+          <td>${formattedDate}</td>
+          <td>${statusBadge}</td>
+        `;
+        table.appendChild(row);
+      });
+    }
+
+    // Update device statistics table
+    function updateDeviceStats(deviceStats, deviceIPs) {
+      var table = document.getElementById('deviceStatsTable');
+      if (!table) return;
+      table.innerHTML = "";
+      
+      if (Object.keys(deviceStats).length === 0) {
+        table.innerHTML = `<tr><td colspan="7" class="text-center">No device statistics available.</td></tr>`;
+        return;
+      }
+      
+      // Create a map for faster device name lookup
+      const deviceMap = {};
+      deviceIPs.forEach(device => {
+        deviceMap[device.device_id] = device.device_name;
+      });
+      
+      for (const [deviceId, stats] of Object.entries(deviceStats)) {
+        var row = document.createElement('tr');
+        const deviceName = deviceMap[deviceId] || 'Unknown Device';
+        
+        // Handle frequency band - either use the one from stats or show "Unknown"
+        const frequencyBand = stats.frequency_band || "Unknown";
+        
+        row.innerHTML = `
+          <td>${deviceName} <small class="text-muted">(${deviceId})</small></td>
+          <td>${stats.last_operator}</td>
+          <td>${stats.last_network_type}</td>
+          <td>${stats.avg_signal_power} dBm</td>
+          <td>${stats.avg_sinr} dB</td>
+          <td>${frequencyBand}</td>
+          <td>${stats.data_points}</td>
+        `;
+        table.appendChild(row);
+      }
+    }
+
+    // (Optional) Fetch data immediately on page load
+    fetchDashboardData();
+  </script>
+
+</body>
+</html>
