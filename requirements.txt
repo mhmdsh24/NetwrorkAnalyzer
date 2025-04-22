@@ -1,0 +1,6 @@
+Flask
+Flask-SQLAlchemy
+Flask-JWT-Extended
+Flask-SocketIO
+psycopg2-binary
+bcrypt

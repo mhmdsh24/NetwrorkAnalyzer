@@ -1,0 +1,60 @@
+Android 2G/3G/4G Network
+Analyzer Project
+American University of Beirut
+EECE 451
+Spring 2025
+Tentative Deadline: last Week before the Reading period
+Introduction
+You are asked to develop an android application named as “Network Cell Analyzer”, which will be
+used to analyze the cell specific data received from the serving base station of the cellular network to
+which your android device is connected. This would allow to track the history of network operators and
+cellular network types to which a mobile device gets connected and provide statistics about the
+experienced link quality and measurements in a distributed manner.
+Proposed System
+With the need for automated network measurements in all generations of mobile networks, a new
+approach is to use smartphone’s APIs so that many mobile users can take part in the process of collecting
+measurements and reporting it to data centers.
+In this project, you will develop an android application that collects cell info from the actively
+connected base station. The application should support GSM/GPRS/EDGE (2G/2.5G), UMTS (3G),
+and LTE (4G) networks. Thanks to the android API, this is enabled using a set of methods that allow
+the device to acquire cell related information.
+This project will also involve the design of a server that will receive network’s cell data from the
+various running phones on a regular basis (for example, each 10 seconds). The android app running on
+the mobile device is expected to send the following cell information regularly to the server along with
+a time stamp:
+1. Operator: Alfa
+2. Signal Power: -11dBm
+3. SINR (Signal to Interference Noise Ratio) or SNR (Signal to Noise Ratio) when applicable:
+5 dB
+4. Network Type: 4G
+5. Frequency Band (if available): 20 (800MHz)
+6. Cell ID (could have different name with different standards): 37100-81937409
+7. Time Stamp: 17 OCT 2022 12:05 pm 
+The server should accept multiple connections for different mobile application simultaneously. Then
+the server is expected to save the data it receives from the application in a database and provide statistics
+for the network information it received based on requests from the android application. The android
+application is expected to show in addition to the real-time cell info mentioned above (Operator, Signal
+Power, Network Type, …), the following statistics (between two specific dates determined by the user)
+that can be requested from the server:
+• Average connectivity time per operator (for example 100% Touch)
+• Average connectivity time per network type, for example: 4G (70%), 3G (30%), 2G (0%)
+• Average Signal Power per network type
+• Average Signal power per device
+• Average SNR or SINR per network type (when applicable)
+• For all the above, statistics should be calculated between time period chosen by the user.
+The server should also include an interface that shows some centralized statistics as follows:
+• Number of connected mobile devices.
+• IP and MAC of previously and currently connected devices.
+• Other information such as per mobile device statistics is an optional feature.
+Grading Criteria
+1. Design and Functionality:
+a. 2G Cell Information Querying (10%)
+b. 3G Cell Information Querying (10%)
+c. 4G Cell Information Querying (10%)
+2. Server Design and Functionality (20%)
+3. Mobile / Server communication (10%)
+4. Realtime & Statistical Services Provided Using the Android App (10%)
+5. Mobile User Interface design (10%)
+6. Presentation and Reporting:
+a. Source Code Quality (10%)
+b. Presentation and documentation (10%) 
