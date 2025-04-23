@@ -739,4 +739,5 @@ if __name__ == '__main__':
     print(f"Use this IP in your Android app's NetworkManager.java")
     
     # Run the server on all interfaces
-    socketio.run(app, debug=True, host='0.0.0.0', port=9000)
+    socketio.run(app, debug=False, host='0.0.0.0', port=9000, allow_unsafe_werkzeug=True)
+
